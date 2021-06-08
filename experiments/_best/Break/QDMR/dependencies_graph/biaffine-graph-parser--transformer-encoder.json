@@ -1,0 +1,128 @@
+{
+    "dataset_reader": {
+        "type": "dependencies_graph",
+        "deps_tags_namespace": "labels",
+        "fill_none_tags": false,
+        "multi_label": false,
+        "pos_field": "tag",
+        "pos_tags_namespace": "pos_tags",
+        "token_indexers": {
+            "tokens": {
+                "type": "pretrained_transformer_mismatched",
+                "max_length": 128,
+                "model_name": "bert-base-uncased"
+            }
+        },
+        "word_field": "text"
+    },
+    "model": {
+        "type": "biaffine_graph_parser",
+        "arc_feedforward": {
+            "activations": "elu",
+            "hidden_dims": 300,
+            "input_dim": 868,
+            "num_layers": 3
+        },
+        "arc_representation_dim": 300,
+        "arc_tags_only": false,
+        "dropout": 0.3,
+        "encoder": {
+            "type": "pass_through",
+            "input_dim": 868
+        },
+        "graph_based_metric": {
+            "type": "logical_form_em_for_graph"
+        },
+        "initializer": {
+            "regexes": [
+                [
+                    ".*feedforward.*weight",
+                    {
+                        "type": "xavier_uniform"
+                    }
+                ],
+                [
+                    ".*feedforward.*bias",
+                    {
+                        "type": "zero"
+                    }
+                ],
+                [
+                    ".*tag_bilinear.*weight",
+                    {
+                        "type": "xavier_uniform"
+                    }
+                ],
+                [
+                    ".*tag_bilinear.*bias",
+                    {
+                        "type": "zero"
+                    }
+                ]
+            ]
+        },
+        "input_dropout": 0.6,
+        "multi_label": false,
+        "pos_tag_embedding": {
+            "embedding_dim": 100,
+            "sparse": false,
+            "vocab_namespace": "pos_tags"
+        },
+        "tag_feedforward": {
+            "activations": "elu",
+            "hidden_dims": 300,
+            "input_dim": 868,
+            "num_layers": 3
+        },
+        "tag_representation_dim": 300,
+        "text_field_embedder": {
+            "token_embedders": {
+                "tokens": {
+                    "type": "pretrained_transformer_mismatched",
+                    "max_length": 128,
+                    "model_name": "bert-base-uncased"
+                }
+            }
+        }
+    },
+    "train_data_path": "datasets/Break/QDMR/train_dependencies_graph.json",
+    "validation_data_path": "datasets/Break/QDMR/dev_dependencies_graph.json",
+    "test_data_path": "datasets/Break/QDMR/test_dependencies_graph__questions_only.json",
+    "trainer": {
+        "checkpointer": {
+            "num_serialized_models_to_keep": 1
+        },
+        "cuda_device": 0,
+        "grad_norm": 5,
+        "learning_rate_scheduler": {
+            "type": "slanted_triangular",
+            "cut_frac": 0.06
+        },
+        "num_epochs": 200,
+        "optimizer": {
+            "type": "huggingface_adamw",
+            "lr": 0.001,
+            "parameter_groups": [
+                [
+                    [
+                        ".*transformer.*"
+                    ],
+                    {
+                        "lr": 5e-05
+                    }
+                ]
+            ],
+            "weight_decay": 0.01
+        },
+        "validation_metric": "+logical_form_em"
+    },
+    "data_loader": {
+        "batch_sampler": {
+            "type": "bucket",
+            "batch_size": 32
+        }
+    },
+    "numpy_seed": 24,
+    "pytorch_seed": 24,
+    "random_seed": 24
+}

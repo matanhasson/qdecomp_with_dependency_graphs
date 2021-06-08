@@ -1,0 +1,177 @@
+{
+  "dataset_reader": {
+    "type": "custom_interleaving",
+    "dataset_field_name": "task",
+    "readers": {
+      "graph_parser": {
+        "type": "dependencies_graph",
+        "deps_tags_namespace": "labels",
+        "fill_none_tags": true,
+        "multi_label": false,
+        "pos_field": "tag",
+        "pos_tags_namespace": "pos_tags",
+        "token_indexers": {
+          "tokens": {
+            "type": "pretrained_transformer_mismatched",
+            "max_length": 128,
+            "model_name": "bert-base-uncased"
+          }
+        },
+        "word_field": "text"
+      },
+      "seq2seq": {
+        "type": "break_copynet_seq2seq",
+        "source_token_indexers": {
+          "tokens": {
+            "type": "pretrained_transformer_mismatched",
+            "max_length": 128,
+            "model_name": "bert-base-uncased"
+          }
+        },
+        "target_namespace": "target_tokens"
+      }
+    }
+  },
+  "model": {
+    "type": "multitask_rat",
+    "graph_loss_weight": 100,
+    "relations_encoding_dim": 384,
+    "separate_kv_classification": false,
+    "seq2seq_model": {
+      "type": "custom_copynet_seq2seq",
+      "attention": "dot_product",
+      "beam_size": 5,
+      "encoder": {
+        "type": "latent_relation_aware_transformer",
+        "dropout": 0.1,
+        "ff_size": 768,
+        "hidden_size": 768,
+        "num_heads": 2,
+        "num_layers": 2,
+        "relation_k_encoder": {
+          "type": "feedforward",
+          "feedforward": {
+            "activations": "relu",
+            "dropout": 0.1,
+            "hidden_dims": 384,
+            "input_dim": 768,
+            "num_layers": 3
+          }
+        },
+        "relation_v_encoder": {
+          "type": "feedforward",
+          "feedforward": {
+            "activations": "relu",
+            "dropout": 0.1,
+            "hidden_dims": 384,
+            "input_dim": 768,
+            "num_layers": 3
+          }
+        },
+        "tie_layers": true
+      },
+      "initializer": {
+        "regexes": [
+          [
+            "_encoder.*self_attn.*weight",
+            {
+              "type": "xavier_uniform"
+            }
+          ],
+          [
+            "_encoder.*self_attn.*bias",
+            {
+              "type": "zero"
+            }
+          ],
+          [
+            "_encoder.*feed_forward.*weight",
+            {
+              "type": "xavier_uniform"
+            }
+          ],
+          [
+            "_encoder.*feed_forward.*bias",
+            {
+              "type": "zero"
+            }
+          ]
+        ]
+      },
+      "max_decoding_steps": 200,
+      "source_embedder": {
+        "token_embedders": {
+          "tokens": {
+            "type": "pretrained_transformer_mismatched",
+            "max_length": 128,
+            "model_name": "bert-base-uncased",
+            "train_parameters": true
+          }
+        }
+      },
+      "target_namespace": "target_tokens",
+      "token_based_metric": {
+        "type": "logical_form_em_for_seq2seq"
+      }
+    },
+    "tags_namespace": "labels"
+  },
+  "train_data_path": {
+    "seq2seq": "datasets/Break/QDMR/train_seq2seq.csv",
+    "graph_parser": "datasets/Break/QDMR/train_dependencies_graph.json"
+  },
+  "validation_data_path": {
+    "seq2seq": "datasets/Break/QDMR/dev_seq2seq.csv",
+    "graph_parser": "datasets/Break/QDMR/dev_dependencies_graph.json"
+  },
+  "test_data_path": {
+    "seq2seq": "datasets/Break/QDMR/test_seq2seq.csv",
+    "graph_parser": "datasets/Break/QDMR/test_dependencies_graph__questions_only.json"
+  },
+  "trainer": {
+    "checkpointer": {
+      "num_serialized_models_to_keep": 1
+    },
+    "cuda_device": 0,
+    "grad_norm": 1,
+    "learning_rate_scheduler": {
+      "type": "slanted_triangular",
+      "cut_frac": 0.06
+    },
+    "num_epochs": 80,
+    "optimizer": {
+      "type": "huggingface_adamw",
+      "lr": 0.001,
+      "parameter_groups": [
+        [
+          [
+            ".*_source_embedder.*transformer.*"
+          ],
+          {
+            "lr": 5e-05
+          }
+        ]
+      ],
+      "weight_decay": 0.01
+    },
+    "validation_metric": "+maximal_logical_form_em"
+  },
+  "data_loader": {
+    "batch_sampler": {
+      "type": "multidatasets_bucket",
+      "batch_size": 16,
+      "dataset_field_name": "task",
+      "sorting_keys_map": {
+        "graph_parser": [
+          "tokens"
+        ],
+        "seq2seq": [
+          "source_tokens"
+        ]
+      }
+    }
+  },
+  "numpy_seed": 24,
+  "pytorch_seed": 24,
+  "random_seed": 24
+}
